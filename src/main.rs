@@ -13,6 +13,9 @@ struct Cli {
     bam: std::path::PathBuf,
     #[structopt(parse(from_os_str))]
     regions: std::path::PathBuf,
+    /// Maximum fragment size to include in the V-plot matrix
+    #[structopt(default_value = "700", short = "x", long = "max-size")]
+    max_fragment_size: i64,
 
 }
 
@@ -88,6 +91,7 @@ fn main() {
         //println!("{}\t{}\t{}", region.chrom(), region.start(), region.end());
 
         let region_chrom = region.chrom();
+        let bed_range = std::ops::Range{start: region.start(), end: region.end()};
         let tid = bam_reader.header().tid(region_chrom.as_bytes()).unwrap();
 
         bam_reader.fetch(tid, region.start(), region.end()).unwrap();
@@ -111,17 +115,18 @@ fn main() {
             // TODO: if record is totally within region && insert < cutoff
             // NOTE: Actually, I think only midpoint needs to be within the region, not the whole read.
             if record.is_proper_pair() && record.is_first_in_template() {
-                // TODO: write to matrix
-                //
                 ventry.update(&region, bed_region_n, &record);
-                println!("{}\t{}\t{}", ventry.row(), ventry.col(), ventry.midpoint());
+                if bed_range.contains(ventry.midpoint()) && ventry.insert_size.abs() <= args.max_fragment_size {
+                    // TODO: write to matrix
+                    println!("{}\t{}\t{}", ventry.row(), ventry.col(), ventry.midpoint());
+                }
             }
 
             // Advance to next bam region
             check = bam_reader.read(&mut record);
         }
 
+        // Advance to next bed region
         bed_region_n += 1;
     }
-
 }
