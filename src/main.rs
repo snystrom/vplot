@@ -3,14 +3,12 @@ extern crate csv;
 extern crate ndarray;
 extern crate ndarray_csv;
 
-use std::convert::{TryInto, TryFrom};
+use std::convert::TryInto;
 use rust_htslib::{bam, bam::Read};
 use structopt::StructOpt;
 use bio::io::bed;
 use ndarray::prelude::*;
-use csv::WriterBuilder;
 use ndarray_csv::Array2Writer;
-use std::fs::File;
 
 #[derive(StructOpt, Debug)]
 #[structopt(setting = structopt::clap::AppSettings::ArgRequiredElseHelp)]
@@ -133,9 +131,7 @@ fn connect_indexed_bam(path: &std::path::PathBuf) -> bam::IndexedReader {
 }
 
 fn initialize_matrix(nrow: i64, ncol: i64) -> Array2<i64> {
-    //let t = ndarray::IntoDimension((nrow, ncol));
-    //Array2::<i64>::zeros((100, 200).f())
-    Array2::<i64>::zeros((nrow as usize, ncol as usize).f())
+    Array2::<i64>::zeros((nrow as usize, ncol as usize))
 }
 
 fn main() {
@@ -202,10 +198,12 @@ fn main() {
     }
 
     // TODO: remove, print final matrix
-    println!("{:?}", vmatrix);
+    //println!("{:?}", vmatrix);
 
-    let file = File::create("mat.csv");
-    let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
-    writer.serialize_array2(&vmatrix);
+    //let file = File::create("mat.csv");
+    //let mut writer = WriterBuilder::new() .has_headers(false) .from_writer(std::io::stdout());
+    let mut writer = csv::Writer::from_writer(std::io::stdout());
+    writer.serialize_array2(&vmatrix)
+          .expect("cannot write matrix to stdout");
 
 }
