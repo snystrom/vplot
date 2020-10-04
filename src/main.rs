@@ -30,7 +30,7 @@ struct VEntry {
 }
 
 impl VEntry {
-    /// Create empty
+    /// Initialize struct with -1's
     fn allocate() -> VEntry {
 
         VEntry {
@@ -61,12 +61,11 @@ impl VEntry {
 
     /// Update fragment entry
     /// Allows operation in same allocation
-    fn update(&mut self, region: &bed::Record, region_n: i64, record: &bam::Record) -> std::io::Result<()> {
+    fn update(&mut self, region: &bed::Record, region_n: i64, record: &bam::Record) {
         self.start = record.pos();
         self.insert_size = record.insert_size();
         self.region_end = region.end().try_into().unwrap();
         self.region_n = region_n;
-        Ok(())
     }
 }
 
