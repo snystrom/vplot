@@ -1,12 +1,16 @@
 extern crate bio;
-extern crate matrix;
+extern crate csv;
+extern crate ndarray;
+extern crate ndarray_csv;
 
 use std::convert::{TryInto, TryFrom};
 use rust_htslib::{bam, bam::Read};
-//use rust_htslib::bam;
 use structopt::StructOpt;
 use bio::io::bed;
-use matrix::prelude::*;
+use ndarray::prelude::*;
+use csv::WriterBuilder;
+use ndarray_csv::Array2Writer;
+use std::fs::File;
 
 #[derive(StructOpt, Debug)]
 #[structopt(setting = structopt::clap::AppSettings::ArgRequiredElseHelp)]
@@ -86,13 +90,13 @@ fn count_bed_entries(path: &std::path::PathBuf) -> i64 {
 
 /// Return (n_bed_entries, bed_width)
 /// n_bed_entries * max_fragment_size = nrow
-fn get_dims_from_bed(path: &std::path::PathBuf) -> (usize, usize) {
+fn get_dims_from_bed(path: &std::path::PathBuf) -> (i64, i64) {
     // loop over records and ensure same width
     // count records
 
     let bed_reader = bed::Reader::from_file(path);
-    let mut n_regions = 0;
-    let mut set_width = 0;
+    let mut n_regions = 0 as i64;
+    let mut set_width = 0 as i64;
     let mut init = true;
     for region in bed_reader.unwrap().records() {
         let record = region.unwrap();
@@ -100,26 +104,24 @@ fn get_dims_from_bed(path: &std::path::PathBuf) -> (usize, usize) {
         // Grab width of first region
         // all other regions should be this width
         if init {
-            set_width = record.end() - record.start();
+            set_width = (record.end() - record.start()).try_into().unwrap();
             init = false;
         }
 
-        let width = record.end() - record.start();
+        let width = (record.end() - record.start()).try_into().unwrap();
 
         if set_width != width {
             panic!("All bed regions must be equal width\nWidth: {} of bed entry on line {} does not match width of first entry: {}", width, n_regions, set_width);
         }
 
     }
-
-    (n_regions as usize, set_width as usize)
+    (n_regions, set_width)
 }
 
 /// (nrow, ncol)
-fn get_matrix_dims(args: &Cli) -> (usize, usize){
+fn get_matrix_dims(args: &Cli) -> (i64, i64){
     let (n_bed, ncol) = get_dims_from_bed(&args.regions);
-    let mfs = usize::try_from(args.max_fragment_size).unwrap();
-    let nrow = n_bed * mfs;
+    let nrow = n_bed * args.max_fragment_size;
     (nrow, ncol)
 }
 
@@ -129,8 +131,10 @@ fn connect_indexed_bam(path: &std::path::PathBuf) -> bam::IndexedReader {
         .expect("Cannot read bam file")
 }
 
-fn initialize_matrix(nrow: usize, ncol: usize) -> Compressed<usize> {
-    Compressed::zero((nrow, ncol))
+fn initialize_matrix(nrow: i64, ncol: i64) -> Array2<i64> {
+    //let t = ndarray::IntoDimension((nrow, ncol));
+    //Array2::<i64>::zeros((100, 200).f())
+    Array2::<i64>::zeros((nrow as usize, ncol as usize).f())
 }
 
 fn main() {
@@ -176,16 +180,15 @@ fn main() {
         // Then save each midpoint of the fragment as: record.pos() + record.insert()
         while check.unwrap() {
 
-            // TODO: if record is totally within region && insert < cutoff
-            // NOTE: Actually, I think only midpoint needs to be within the region, not the whole read.
+            // NOTE: Here I'm parsing only 0x040 which corresponds to R1 in
+            // illumina sequencing This lets me ignore the problem of
+            // double-counting read pairs, because the information I need is
+            // stored in R1 and R2, I ignore R2.
             if record.is_proper_pair() && record.is_first_in_template() {
                 ventry.update(&region, bed_region_n, &record);
+                // If midpoint is within the region and below cutoff, save it
                 if bed_range.contains(&ventry.midpoint().try_into().unwrap()) && ventry.insert_size.abs() <= args.max_fragment_size {
-                    // TODO: write to matrix
-                    let mut val = vmatrix.get((ventry.row(), ventry.col()));
-                    val += 1;
-                    vmatrix.set((ventry.row(), ventry.col()), val);
-                    //println!("{}\t{}\t{}", ventry.row(), ventry.col(), ventry.midpoint());
+                    vmatrix[[ventry.row(), ventry.col()]] += 1;
                 }
             }
 
