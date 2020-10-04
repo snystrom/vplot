@@ -60,7 +60,8 @@ impl VEntry {
     /// Row in the VMatrix this entry should be inserted into
     fn row(&self) -> usize {
         // NOTE: region count has to be > 0, else will get all 0's for first region row positions
-        ((self.region_n + 1) * self.insert_size.abs()).try_into().unwrap()
+        // But ndarray is 0 indexed, so subtract 1 from final to get row #
+        (((self.region_n + 1) * self.insert_size.abs()) - 1).try_into().unwrap()
     }
 
     /// Column in the VMatrix this entry should be inserted into
