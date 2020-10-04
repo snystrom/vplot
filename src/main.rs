@@ -202,4 +202,9 @@ fn main() {
 
     // TODO: remove, print final matrix
     println!("{:?}", vmatrix);
+
+    let file = File::create("mat.csv");
+    let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
+    writer.serialize_array2(&vmatrix);
+
 }
