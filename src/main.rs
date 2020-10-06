@@ -20,6 +20,8 @@ struct Cli {
     /// Maximum fragment size to include in the V-plot matrix
     #[structopt(default_value = "700", short = "x", long = "max-size")]
     max_fragment_size: i64,
+    #[structopt(default_value = "midpoint", short = "f", long = "fragment-type", possible_values = &["midpoint", "ends", "fragment"])]
+    fragment_type: String
 
 }
 
@@ -65,7 +67,8 @@ impl VEntry {
         self.start = read.pos();
         self.insert_size = read.insert_size();
         self.region_end = region.end().try_into().unwrap();
-        self.region_n = region_n;
+        self.region_n = region_n
+
     }
 
     fn row(&self) -> usize {
@@ -129,6 +132,27 @@ impl VMatrix {
                 self.matrix[[entry.row(), end_col as usize]] += 1;
             }
         }
+    }
+
+    fn insert_fragment(&mut self, entry: &VEntry) {
+        if entry.insert_size.abs() <= self.max_fragment_size {
+
+            let start_col = entry.region_end - entry.start;
+            let end_col = entry.region_end - (entry.start + entry.insert_size);
+
+            // Possible valid column values
+            let col_range = 0..self.ncol;
+            // column coordinates of fragment bases
+            let fragment_range = core::cmp::min(start_col, end_col)..core::cmp::max(start_col, end_col);
+
+            for col in fragment_range {
+                if col_range.contains(&col) {
+                    self.matrix[[entry.row(), col as usize]] += 1;
+                }
+            }
+
+        }
+
     }
 }
 
@@ -226,12 +250,6 @@ fn main() {
         // check holds bool determining if reads remain in region
         let mut check = bam_reader.read(&mut read);
 
-        //TODO:
-        // Since I want an indexed bam file, it can't be sorted.
-        // so, I think what I need to do is for each record
-        // only save if record.is_paired(), on the same chromosome, and totally within the bed region, and insert size < size cutoff.
-        //  -
-        // Then save each midpoint of the fragment as: record.pos() + record.insert()
         while check.unwrap() {
 
             // NOTE: Here I'm parsing only 0x040 which corresponds to R1 in
@@ -241,25 +259,29 @@ fn main() {
             if read.is_proper_pair() && read.is_first_in_template() {
                 ventry.update(&region, bed_region_n, &read);
 
-                // TODO: remove the max_fragment_size code since it's now a part of VMatrix.insert_
-                if bed_range.contains(&ventry.midpoint().try_into().unwrap()) {
-                    vmatrix.insert_midpoint(&ventry);
-                }
-            }
+                match &args.fragment_type[..] {
+                    "ends" => vmatrix.insert_fragment_ends(&ventry),
+                    "fragment" => vmatrix.insert_fragment(&ventry),
+                    "midpoint" => {
+                        if bed_range.contains(&ventry.midpoint().try_into().unwrap()) {
+                            vmatrix.insert_midpoint(&ventry);
+                        }
+                    },
+                    _ => println!("Error: Unknown fragment type"),
+
+                    }
+
+                } 
 
             // Advance to next bam region
             check = bam_reader.read(&mut read);
-        }
+
+            }
 
         // Advance to next bed region
         bed_region_n += 1;
     }
 
-    // TODO: remove, print final matrix
-    //println!("{:?}", vmatrix);
-
-    //let file = File::create("mat.csv");
-    //let mut writer = WriterBuilder::new() .has_headers(false) .from_writer(std::io::stdout());
     let mut writer = csv::Writer::from_writer(std::io::stdout());
     writer.serialize_array2(&vmatrix.matrix)
           .expect("cannot write matrix to stdout");
