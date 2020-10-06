@@ -105,6 +105,7 @@ impl VMatrix {
     }
 
     fn insert_midpoint(&mut self, entry: &VEntry) {
+        //TODO: consider doing the ncol check as in insert_fragment_ends?
         if entry.insert_size.abs() <= self.max_fragment_size {
             // Column in the VMatrix this entry should be inserted into
             // value must be usize because matrix library needs usize
@@ -117,13 +118,17 @@ impl VMatrix {
     fn insert_fragment_ends(&mut self, entry: &VEntry) {
         if entry.insert_size.abs() <= self.max_fragment_size {
 
-            let start_col: usize = (entry.region_end - entry.start).try_into().unwrap();
-            let end_col: usize = (entry.region_end - (entry.start + entry.insert_size)).try_into().unwrap();
+            let start_col = entry.region_end - entry.start;
+            let end_col = entry.region_end - (entry.start + entry.insert_size);
 
-            self.matrix[[entry.row(), start_col]] += 1;
-            self.matrix[[entry.row(), end_col]] += 1;
+            if start_col >= 0 && start_col <= self.ncol as i64 {
+                self.matrix[[entry.row(), start_col as usize]] += 1;
+            }
+
+            if end_col >= 0 && end_col <= self.ncol as i64 {
+                self.matrix[[entry.row(), end_col as usize]] += 1;
+            }
         }
-
     }
 }
 
