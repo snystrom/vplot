@@ -59,26 +59,20 @@ impl VEntry {
         self.start + (self.insert_size/2)
     }
 
-    /// Row in the VMatrix this entry should be inserted into
+    /// Update fragment entry
+    /// Allows operation in same allocation
+    fn update(&mut self, region: &bed::Record, region_n: i64, read: &bam::Record) {
+        self.start = read.pos();
+        self.insert_size = read.insert_size();
+        self.region_end = region.end().try_into().unwrap();
+        self.region_n = region_n;
+    }
+
     fn row(&self) -> usize {
+        // Row in the VMatrix this entry should be inserted into
         // NOTE: region count has to be > 0, else will get all 0's for first region row positions
         // But ndarray is 0 indexed, so subtract 1 from final to get row #
         (((self.region_n + 1) * self.insert_size.abs()) - 1).try_into().unwrap()
-    }
-
-    /// Column in the VMatrix this entry should be inserted into
-    // value must be usize because matrix library needs usize
-    fn col(&self) -> usize {
-        (self.region_end - self.midpoint()).try_into().unwrap()
-    }
-
-    /// Update fragment entry
-    /// Allows operation in same allocation
-    fn update(&mut self, region: &bed::Record, region_n: i64, record: &bam::Record) {
-        self.start = record.pos();
-        self.insert_size = record.insert_size();
-        self.region_end = region.end().try_into().unwrap();
-        self.region_n = region_n;
     }
 }
 
@@ -97,7 +91,7 @@ impl VMatrix {
         let nrow: i64 = regions.n_regions * max_fragment_size;
 
         VMatrix {
-            matrix: VMatrix::_initialize_matrix(regions.width, regions.n_regions),
+            matrix: VMatrix::_initialize_matrix(nrow, regions.width),
             ncol: regions.width,
             nrow: nrow,
             n_regions: regions.n_regions,
@@ -109,10 +103,30 @@ impl VMatrix {
     fn _initialize_matrix(nrow: i64, ncol: i64) -> Array2<i64> {
         Array2::<i64>::zeros((nrow as usize, ncol as usize))
     }
-    fn insert_midpoint() {
+
+    fn insert_midpoint(&mut self, entry: &VEntry) {
+        if entry.insert_size.abs() <= self.max_fragment_size {
+            // Column in the VMatrix this entry should be inserted into
+            // value must be usize because matrix library needs usize
+            let col: usize = (entry.region_end - entry.midpoint()).try_into().unwrap();
+
+            self.matrix[[entry.row(), col]] += 1;
+        }
+    }
+
+    fn insert_fragment_ends(&mut self, entry: &VEntry) {
+        if entry.insert_size.abs() <= self.max_fragment_size {
+
+            let start_col: usize = (entry.region_end - entry.start).try_into().unwrap();
+            let end_col: usize = (entry.region_end - (entry.start + entry.insert_size)).try_into().unwrap();
+
+            self.matrix[[entry.row(), start_col]] += 1;
+            self.matrix[[entry.row(), end_col]] += 1;
+        }
 
     }
 }
+
 
 struct VRegions<'a> {
     path: &'a std::path::PathBuf,
@@ -201,11 +215,11 @@ fn main() {
 
         // read fetched records into bam_record in loop,
         // write out to matrix
-        let mut record = bam::Record::new();
+        let mut read = bam::Record::new();
 
         // initialize loop
         // check holds bool determining if reads remain in region
-        let mut check = bam_reader.read(&mut record);
+        let mut check = bam_reader.read(&mut read);
 
         //TODO:
         // Since I want an indexed bam file, it can't be sorted.
@@ -219,16 +233,17 @@ fn main() {
             // illumina sequencing This lets me ignore the problem of
             // double-counting read pairs, because the information I need is
             // stored in R1 and R2, I ignore R2.
-            if record.is_proper_pair() && record.is_first_in_template() {
-                ventry.update(&region, bed_region_n, &record);
-                // If midpoint is within the region and below cutoff, save it
-                if bed_range.contains(&ventry.midpoint().try_into().unwrap()) && ventry.insert_size.abs() <= args.max_fragment_size {
-                    vmatrix[[ventry.row(), ventry.col()]] += 1;
+            if read.is_proper_pair() && read.is_first_in_template() {
+                ventry.update(&region, bed_region_n, &read);
+
+                // TODO: remove the max_fragment_size code since it's now a part of VMatrix.insert_
+                if bed_range.contains(&ventry.midpoint().try_into().unwrap()) {
+                    vmatrix.insert_midpoint(&ventry);
                 }
             }
 
             // Advance to next bam region
-            check = bam_reader.read(&mut record);
+            check = bam_reader.read(&mut read);
         }
 
         // Advance to next bed region
@@ -241,7 +256,7 @@ fn main() {
     //let file = File::create("mat.csv");
     //let mut writer = WriterBuilder::new() .has_headers(false) .from_writer(std::io::stdout());
     let mut writer = csv::Writer::from_writer(std::io::stdout());
-    writer.serialize_array2(&vmatrix)
+    writer.serialize_array2(&vmatrix.matrix)
           .expect("cannot write matrix to stdout");
 
 }
