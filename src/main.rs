@@ -86,19 +86,28 @@ impl VEntry {
 struct VMatrix {
     matrix: ndarray::Array2<i64>,
     n_regions: i64,
-    width: i64,
+    ncol: i64,
+    nrow: i64,
     max_fragment_size: i64
 }
 
 impl VMatrix {
-    fn allocate(n_regions: i64, width: i64, max_fragment_size: i64) -> VMatrix {
-        VMatrix{
-            matrix: initialize_matrix(width, n_regions),
-            n_regions: n_regions,
-            max_fragment_size: max_fragment_size
+    fn allocate(regions: &VRegions, max_fragment_size: &i64) -> VMatrix {
+
+        let nrow: i64 = regions.n_regions * max_fragment_size;
+
+        VMatrix {
+            matrix: VMatrix::_initialize_matrix(regions.width, regions.n_regions),
+            ncol: regions.width,
+            nrow: nrow,
+            n_regions: regions.n_regions,
+            max_fragment_size: *max_fragment_size
         }
 
+    }
 
+    fn _initialize_matrix(nrow: i64, ncol: i64) -> Array2<i64> {
+        Array2::<i64>::zeros((nrow as usize, ncol as usize))
     }
     fn insert_midpoint() {
 
@@ -155,26 +164,16 @@ impl VRegions<'_> {
 }
 
 
-/// (nrow, ncol)
-fn get_matrix_dims(args: &Cli) -> (i64, i64){
-    let (n_bed, ncol) = get_dims_from_bed(&args.regions);
-    let nrow = n_bed * args.max_fragment_size;
-    (nrow, ncol)
-}
-
 fn connect_indexed_bam(path: &std::path::PathBuf) -> bam::IndexedReader {
     bam::IndexedReader::from_path(path)
         .ok()
         .expect("Cannot read bam file")
 }
 
-fn initialize_matrix(nrow: i64, ncol: i64) -> Array2<i64> {
-    Array2::<i64>::zeros((nrow as usize, ncol as usize))
-}
-
 fn main() {
     let args = Cli::from_args();
-    let bed_reader = bed::Reader::from_file(&args.regions);
+    let regions = VRegions::new(&args.regions);
+    let bed_reader = bed::Reader::from_file(regions.path);
     let mut bam_reader = connect_indexed_bam(&args.bam);
 
     let mut ventry = VEntry::allocate();
@@ -182,9 +181,10 @@ fn main() {
     // TODO: remove below comments (debug)
     //let (n_bed, ncol) = get_dims_from_bed(&args.regions);
     //let nrow = n_bed * (args.max_fragment_size as usize);
-    let (nrow, ncol) = get_matrix_dims(&args);
-
-    let mut vmatrix = initialize_matrix(nrow, ncol);
+    // NOTE: OLD
+    //let (nrow, ncol) = get_matrix_dims(&args);
+    //let mut vmatrix = initialize_matrix(nrow, ncol);
+    let mut vmatrix = VMatrix::allocate(&regions, &args.max_fragment_size);
 
     let mut bed_region_n = 0 as i64;
     for bed_region in bed_reader.unwrap().records() {
