@@ -41,14 +41,18 @@ impl VEntry {
     fn allocate() -> VEntry {
 
         VEntry {
+            /// Start coordinate of read
             start: -1,
+            /// Total fragment length (TLEN)
             insert_size: -1,
+            /// End point of fragment
             region_end: -1,
+            /// Tracks which bed region the read belongs to
             region_n: -1,
         }
     }
 
-    /// Midpoint of the fragment
+    /// Computes the midpoint of the fragment
     fn midpoint(&self) -> i64 {
         // NOTE: midpoint is rounded down if insert_size is odd
         // TODO: Fix?? Round up?
@@ -78,44 +82,78 @@ impl VEntry {
     }
 }
 
-// TODO: VMatrix struct that hold matrix
-
-fn count_bed_entries(path: &std::path::PathBuf) -> i64 {
-    let bed_reader = bed::Reader::from_file(path);
-    bed_reader.unwrap()
-              .records()
-              .count() as i64
+/// Holds the vplot matrix
+struct VMatrix {
+    matrix: ndarray::Array2<i64>,
+    n_regions: i64,
+    width: i64,
+    max_fragment_size: i64
 }
 
-/// Return (n_bed_entries, bed_width)
-/// n_bed_entries * max_fragment_size = nrow
-fn get_dims_from_bed(path: &std::path::PathBuf) -> (i64, i64) {
-    // loop over records and ensure same width
-    // count records
-
-    let bed_reader = bed::Reader::from_file(path);
-    let mut n_regions = 0 as i64;
-    let mut set_width = 0 as i64;
-    let mut init = true;
-    for region in bed_reader.unwrap().records() {
-        let record = region.unwrap();
-        n_regions += 1;
-        // Grab width of first region
-        // all other regions should be this width
-        if init {
-            set_width = (record.end() - record.start()).try_into().unwrap();
-            init = false;
+impl VMatrix {
+    fn allocate(n_regions: i64, width: i64, max_fragment_size: i64) -> VMatrix {
+        VMatrix{
+            matrix: initialize_matrix(width, n_regions),
+            n_regions: n_regions,
+            max_fragment_size: max_fragment_size
         }
 
-        let width = (record.end() - record.start()).try_into().unwrap();
-
-        if set_width != width {
-            panic!("All bed regions must be equal width\nWidth: {} of bed entry on line {} does not match width of first entry: {}", width, n_regions, set_width);
-        }
 
     }
-    (n_regions, set_width)
+    fn insert_midpoint() {
+
+    }
 }
+
+struct VRegions<'a> {
+    path: &'a std::path::PathBuf,
+    n_regions: i64,
+    width: i64,
+}
+
+impl VRegions<'_> {
+    fn new(path: &std::path::PathBuf) -> VRegions {
+        let (n_regions, width) = VRegions::_get_dims_from_bed(path);
+
+        VRegions {
+            path: path,
+            n_regions: n_regions,
+            width: width
+        }
+    }
+
+    /// Return (n_bed_entries, bed_width)
+    /// n_bed_entries * max_fragment_size = nrow
+    fn _get_dims_from_bed(path: &std::path::PathBuf) -> (i64, i64) {
+        // loop over records and ensure same width
+        // count records
+
+        let bed_reader = bed::Reader::from_file(path);
+        let mut n_regions = 0 as i64;
+        let mut set_width = 0 as i64;
+        let mut init = true;
+        for region in bed_reader.unwrap().records() {
+            let record = region.unwrap();
+            n_regions += 1;
+            // Grab width of first region
+            // all other regions should be this width
+            if init {
+                set_width = (record.end() - record.start()).try_into().unwrap();
+                init = false;
+            }
+
+            let width = (record.end() - record.start()).try_into().unwrap();
+
+            if set_width != width {
+                panic!("All bed regions must be equal width\nWidth: {} of bed entry on line {} does not match width of first entry: {}", width, n_regions, set_width);
+            }
+
+        }
+        (n_regions, set_width)
+    }
+
+}
+
 
 /// (nrow, ncol)
 fn get_matrix_dims(args: &Cli) -> (i64, i64){
