@@ -46,7 +46,9 @@ vplot --version
 
 ## Usage
 
-Note that in the returned matrix, the columns are genomic coordinate (leftmost column is 5' end), and rows are fragment size (top row is *smallest* fragment size)
+Note that in the returned matrix, the columns are genomic coordinate (leftmost
+column is 5' end), and rows are fragment size (top row is *smallest* fragment
+size)
 
 ``` sh
 
