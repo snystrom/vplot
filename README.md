@@ -58,14 +58,16 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -f, --fragment-type <fragment-type>    How reads are counted in the matrix. Using either the midpoint of the
-                                           fragment, fragment ends, or the whole fragment [default: midpoint]  [possible
-                                           values: midpoint, ends, fragment]
-    -x, --max-size <max-fragment-size>     Maximum fragment size to include in the V-plot matrix [default: 700]
+    -f, --fragment-type <fragment-type>    How reads are counted in the matrix. Using either the 
+                                           midpoint of the fragment, fragment ends, or the whole fragment 
+                                           [default: midpoint] [alt values: ends, fragment]
+    -x, --max-size <max-fragment-size>     Maximum fragment size to include 
+                                           in the V-plot matrix [default: 700]
 
 ARGS:
     <bam>        Path to an indexed bam file
-    <regions>    Path to a bed file (must be in bed4 format: chr, start, end, strand) Of a region (or regions) in
-                 which to generate the vplot matrix. If using multiple regions, all entries must be the same width. (NOTE:
+    <regions>    Path to a bed file (must be in bed4 format: chr, start, end, strand) 
+                 Of a region (or regions) in which to generate the vplot matrix. 
+                 If using multiple regions, all entries must be the same width. (NOTE:
                  using more than 1 region is poorly supported currently, but technically works)
 ```
