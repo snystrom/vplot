@@ -13,13 +13,18 @@ use ndarray_csv::Array2Writer;
 #[derive(StructOpt, Debug)]
 #[structopt(setting = structopt::clap::AppSettings::ArgRequiredElseHelp)]
 struct Cli {
+    /// Path to an indexed bam file
     #[structopt(parse(from_os_str))]
     bam: std::path::PathBuf,
+    /// Path to a bed file (must be in bed4 format: chr, start, end, strand) Of
+    /// a region (or regions) in which to generate the vplot. If using multiple
+    /// regions, all entries must be the same width. (NOTE: using more than 1 region is poorly supported currently, but technically works)
     #[structopt(parse(from_os_str))]
     regions: std::path::PathBuf,
     /// Maximum fragment size to include in the V-plot matrix
     #[structopt(default_value = "700", short = "x", long = "max-size")]
     max_fragment_size: i64,
+    /// How reads are counted in the matrix. Using either the midpoint of the fragment, fragment ends, or the whole fragment.
     #[structopt(default_value = "midpoint", short = "f", long = "fragment-type", possible_values = &["midpoint", "ends", "fragment"])]
     fragment_type: String
 
@@ -263,6 +268,7 @@ fn main() {
                     "ends" => vmatrix.insert_fragment_ends(&ventry),
                     "fragment" => vmatrix.insert_fragment(&ventry),
                     "midpoint" => {
+                        // TODO: move this logic into the insert function like the other two.
                         if bed_range.contains(&ventry.midpoint().try_into().unwrap()) {
                             vmatrix.insert_midpoint(&ventry);
                         }
