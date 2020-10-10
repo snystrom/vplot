@@ -35,6 +35,8 @@ struct VEntry {
     start: i64,
     /// Insert size of the fragment
     insert_size: i64,
+    /// Start coordinate of the bed region
+    region_start: i64,
     /// End coordinate of the bed region
     region_end: i64,
     /// index of which bed region this fragment resides in
@@ -52,6 +54,8 @@ impl VEntry {
             start: -1,
             /// Total fragment length (TLEN)
             insert_size: -1,
+            /// Start point of fragment
+            region_start: -1,
             /// End point of fragment
             region_end: -1,
             /// Tracks which bed region the read belongs to
@@ -71,6 +75,7 @@ impl VEntry {
     fn update(&mut self, region: &bed::Record, region_n: i64, read: &bam::Record) {
         self.start = read.pos();
         self.insert_size = read.insert_size();
+        self.region_start = region.start().try_into().unwrap();
         self.region_end = region.end().try_into().unwrap();
         self.region_n = region_n
 
@@ -117,33 +122,46 @@ impl VMatrix {
         if entry.insert_size.abs() <= self.max_fragment_size {
             // Column in the VMatrix this entry should be inserted into
             // value must be usize because matrix library needs usize
-            let col: usize = (entry.region_end - entry.midpoint()).try_into().unwrap();
-
-            self.matrix[[entry.row(), col]] += 1;
+            let col = entry.midpoint() - entry.region_start;
+           
+            self.matrix[[entry.row(), col as usize]] += 1;
         }
     }
 
     fn insert_fragment_ends(&mut self, entry: &VEntry) {
         if entry.insert_size.abs() <= self.max_fragment_size {
 
-            let start_col = entry.region_end - entry.start;
-            let end_col = entry.region_end - (entry.start + entry.insert_size);
+            // since I don't care about directionality,
+            // i can swap start/end coords of the read fine.
+            let start_col = entry.start - entry.region_start;
+            let end_col = (entry.start + entry.insert_size) - entry.region_start;
 
-            if start_col >= 0 && start_col <= self.ncol as i64 {
-                self.matrix[[entry.row(), start_col as usize]] += 1;
+            // Possible valid column values
+            let col_range = 0..self.ncol;
+
+            // since orientation doesn't matter, just position,
+            // use min/max to convert into following tuple:
+            // (start, end)
+            let (start, end) = (core::cmp::min(start_col, end_col), core::cmp::max(start_col, end_col));
+
+            if col_range.contains(&start) {
+                self.matrix[[entry.row(), start as usize]] += 1;
             }
 
-            if end_col >= 0 && end_col <= self.ncol as i64 {
-                self.matrix[[entry.row(), end_col as usize]] += 1;
+            if col_range.contains(&end) {
+                self.matrix[[entry.row(), end as usize]] += 1;
             }
+
         }
     }
 
     fn insert_fragment(&mut self, entry: &VEntry) {
         if entry.insert_size.abs() <= self.max_fragment_size {
 
-            let start_col = entry.region_end - entry.start;
-            let end_col = entry.region_end - (entry.start + entry.insert_size);
+            //let start_col = entry.region_end - entry.start;
+            //let end_col = entry.region_end - (entry.start + entry.insert_size);
+            let start_col = entry.start - entry.region_start;
+            let end_col = (entry.start + entry.insert_size) - entry.region_start;
 
             // Possible valid column values
             let col_range = 0..self.ncol;
@@ -226,12 +244,6 @@ fn main() {
 
     let mut ventry = VEntry::allocate();
 
-    // TODO: remove below comments (debug)
-    //let (n_bed, ncol) = get_dims_from_bed(&args.regions);
-    //let nrow = n_bed * (args.max_fragment_size as usize);
-    // NOTE: OLD
-    //let (nrow, ncol) = get_matrix_dims(&args);
-    //let mut vmatrix = initialize_matrix(nrow, ncol);
     let mut vmatrix = VMatrix::allocate(&regions, &args.max_fragment_size);
 
     let mut bed_region_n = 0 as i64;
