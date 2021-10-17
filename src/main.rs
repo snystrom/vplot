@@ -28,8 +28,53 @@ struct Cli {
     #[structopt(default_value = "midpoint", short = "f", long = "fragment-type", possible_values = &["midpoint", "ends", "fragment"])]
     fragment_type: String,
     /// Instead of aggregating reads into 1 matrix, write 1 matrix for each region.
+    /// Matrices are written as 1 csv per region named: `chr-start-end.csv`
     #[structopt(short = "m", long)]
-    multi: bool
+    multi: bool,
+    /// Set output file name. This option behaves differently depending on which input flags are set. See --help for details.
+    ///
+    /// If --multi is unset and -o is set to a directory, the output file will be written to: outdir/<bamfile>.vmatrix.csv.
+    /// if --multi is unset and -o is a file path, output file will be written to this file name.
+    /// if --multi is set and -o is a directory, files will be written to outdir as: outdir/chr-start-end.csv.
+    /// if --multi is set and -o is a string, the string will be used as a prefix, and files will be written as: <prefix>chr-start-end.csv.
+    ///
+    /// Examples:
+    ///
+    /// vplot reads.bam regions.bed > output.csv
+    ///
+    /// vplot -o outdir/ reads.bam regions.bed
+    ///
+    ///   returns: outdir/reads.bam.vmatrix.csv
+    ///
+    /// vplot -o matrix.csv reads.bam regions.bed
+    ///
+    ///   returns: matrix.csv
+    ///
+    /// vplot -m -o outdir/ reads.bam regions.bed
+    ///
+    ///   returns:
+    ///      - outdir/chr1-1000-2000.csv
+    ///     
+    ///      - outdir/chr2-1000-2000.csv
+    ///
+    /// vplot -m -o myPrefix_ reads.bam regions.bed
+    ///
+    ///   returns:
+    ///
+    ///      - myPrefix_chr1-1000-2000.csv
+    ///
+    ///      - myPrefix_chr2-1000-2000.csv
+    ///
+    /// vplot -m -o outdir/myPrefix_ reads.bam regions.bed
+    ///
+    ///   returns:
+    ///
+    ///      - outdir/myPrefix_chr1-1000-2000.csv
+    ///
+    ///      - outdir/myPrefix_chr2-1000-2000.csv
+    ///
+    #[structopt(default_value = "-", short = "o", long)]
+    output: String,
     //TODO: add flag to use bed column as matrix output name
 
 }
@@ -195,6 +240,11 @@ impl VMatrix {
         }
 
     }
+
+    // re-zeroes matrix
+    fn clear(&mut self) {
+        self.matrix.iter_mut().for_each(|m| *m = 0)
+    }
 }
 
 
@@ -260,11 +310,19 @@ fn connect_indexed_bam(path: &std::path::PathBuf) -> bam::IndexedReader {
         .expect("Cannot read bam file")
 }
 
+fn get_output_prefix(path: &str) -> &str {
+    match path {
+        "-" => "",
+        _ => path
+    }
+}
+
 fn main() {
     let args = Cli::from_args();
     let regions = VRegions::new(&args.regions);
     let bed_reader = bed::Reader::from_file(regions.path);
     let mut bam_reader = connect_indexed_bam(&args.bam);
+    let output_prefix = get_output_prefix(&args.output);
 
     let mut ventry = VEntry::allocate();
 
@@ -313,23 +371,67 @@ fn main() {
 
                     }
 
-                } 
+            }
 
             // Advance to next bam region
             check = bam_reader.read(&mut read);
 
             }
 
+
         // Advance to next bed region
         // TODO: if -multi = True, increment this, else skip (to aggregate into 1 matrix)
         if !vmatrix.aggregate {
             bed_region_n += 1;
+
+            // write csv named "{chr}-{start}-{end}.csv"
+            // then re-zero matrix
+            let region_name = format!("{}{}-{}-{}.csv", output_prefix, region_chrom, region.start(), region.end());
+
+            let mut writer = csv::Writer::from_path(&region_name)
+                .expect(&format!("cannot open connection to {} for writing", &region_name));
+
+            writer.serialize_array2(&vmatrix.matrix)
+                  .expect(&format!("cannot write matrix to {}", &region_name));
+
+            vmatrix.clear();
+
         }
     }
 
-    // TODO: if multi = True, write 1 matrix per region to file
-    let mut writer = csv::Writer::from_writer(std::io::stdout());
-    writer.serialize_array2(&vmatrix.matrix)
-          .expect("cannot write matrix to stdout");
 
+    fn write_mat_stdout(vmatrix: &VMatrix){
+        let mut writer = csv::Writer::from_writer(std::io::stdout());
+        writer.serialize_array2(&vmatrix.matrix)
+              .expect("cannot write matrix to stdout");
+
+    }
+
+    fn write_mat_path(vmatrix: &VMatrix, path: &str, bam: &str){
+
+        // if path is directory write to dir/vmatrix.csv
+        // https://stackoverflow.com/a/64952550
+
+        let outfile;
+
+        if path.ends_with("/") {
+            outfile = format!("{}/{}.vmatrix.csv", &path, &bam);
+        } else {
+            outfile = path.to_string();
+        }
+
+        let mut writer = csv::Writer::from_path(&outfile)
+            .expect(&format!("cannot open connection to {} for writing", &outfile));
+
+        writer.serialize_array2(&vmatrix.matrix)
+              .expect(&format!("cannot write matrix to {}", &outfile));
+
+    }
+
+    if vmatrix.aggregate {
+        match output_prefix {
+            "" => write_mat_stdout(&vmatrix),
+            _  => write_mat_path(&vmatrix, output_prefix, &args.bam.into_os_string().into_string().unwrap())
+        }
+    }
 }
