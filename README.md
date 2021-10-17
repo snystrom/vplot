@@ -47,17 +47,18 @@ vplot --version
 ## Usage
 
 Note that in the returned matrix, the columns are genomic coordinate (leftmost
-column is 5' end), and rows are fragment size (top row is *smallest* fragment
-size)
+column is 5' end), and rows are fragment size (top row is *largest* fragment
+size, this can be swapped using `-i`)
 
 ``` sh
-vplot 0.3.11
+vplot 0.3.3
 
 USAGE:
     vplot [FLAGS] [OPTIONS] <bam> <regions>
 
 FLAGS:
     -h, --help       Prints help information
+    -i, --invert     Invert the matrix so that the smallest fragments appear at the top
     -m, --multi      Instead of aggregating reads into 1 matrix, write 1 matrix for each region. Matrices are written as
                      1 csv per region named: `chr-start-end.csv`
     -V, --version    Prints version information
