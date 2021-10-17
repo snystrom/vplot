@@ -27,6 +27,9 @@ struct Cli {
     /// How reads are counted in the matrix. Using either the midpoint of the fragment, fragment ends, or the whole fragment.
     #[structopt(default_value = "midpoint", short = "f", long = "fragment-type", possible_values = &["midpoint", "ends", "fragment"])]
     fragment_type: String,
+    /// Invert the matrix so that the smallest fragments appear at the top.
+    #[structopt(short = "i", long)]
+    invert: bool,
     /// Instead of aggregating reads into 1 matrix, write 1 matrix for each region.
     /// Matrices are written as 1 csv per region named: `chr-start-end.csv`
     #[structopt(short = "m", long)]
@@ -108,7 +111,7 @@ impl VEntry {
             /// End point of fragment
             region_end: -1,
             /// Tracks which bed region the read belongs to
-            region_n: -1,
+            region_n: -1
         }
     }
 
@@ -134,7 +137,8 @@ impl VEntry {
         // Row in the VMatrix this entry should be inserted into
         // NOTE: region count has to be > 0, else will get all 0's for first region row positions
         // But ndarray is 0 indexed, so subtract 1 from final to get row #
-        ((self.insert_size.abs()) - 1).try_into().unwrap()
+        //((self.insert_size.abs()) - 1).try_into().unwrap()
+        (self.insert_size.abs()).try_into().unwrap()
     }
 }
 
@@ -144,11 +148,13 @@ struct VMatrix {
     ncol: i64,
     //nrow: i64,
     max_fragment_size: i64,
-    aggregate: bool
+    aggregate: bool,
+    /// Whether entries should be inserted using inverted y-coordinates
+    invert: bool
 }
 
 impl VMatrix {
-    fn allocate(regions: &VRegions, max_fragment_size: &i64, multi: &bool) -> VMatrix {
+    fn allocate(regions: &VRegions, max_fragment_size: &i64, multi: &bool, invert: &bool) -> VMatrix {
 
         let nrow = *max_fragment_size;
 
@@ -157,7 +163,8 @@ impl VMatrix {
             ncol: regions.width,
             //nrow: nrow,
             max_fragment_size: *max_fragment_size,
-            aggregate: !multi
+            aggregate: !multi,
+            invert: *invert
         }
 
     }
@@ -172,8 +179,11 @@ impl VMatrix {
             // Column in the VMatrix this entry should be inserted into
             // value must be usize because matrix library needs usize
             let col = entry.midpoint() - entry.region_start;
-           
-            self.matrix[[entry.row(), col as usize]] += 1;
+
+            let row = if self.invert {entry.row()} else {self.max_fragment_size as usize - entry.row()};
+
+            //self.matrix[[entry.row(), col as usize]] += 1;
+            self.matrix[[row, col as usize]] += 1;
         }
     }
 
@@ -185,6 +195,7 @@ impl VMatrix {
             let start_col = entry.start - entry.region_start;
             let end_col = (entry.start + entry.insert_size) - entry.region_start;
 
+            let row = if self.invert {entry.row()} else {self.max_fragment_size as usize - entry.row()};
             // Possible valid column values
             let col_range = 0..self.ncol;
 
@@ -194,11 +205,11 @@ impl VMatrix {
             let (start, end) = (core::cmp::min(start_col, end_col), core::cmp::max(start_col, end_col));
 
             if col_range.contains(&start) {
-                self.matrix[[entry.row(), start as usize]] += 1;
+                self.matrix[[row, start as usize]] += 1;
             }
 
             if col_range.contains(&end) {
-                self.matrix[[entry.row(), end as usize]] += 1;
+                self.matrix[[row, end as usize]] += 1;
             }
 
         }
@@ -212,6 +223,8 @@ impl VMatrix {
             let start_col = entry.start - entry.region_start;
             let end_col = (entry.start + entry.insert_size) - entry.region_start;
 
+            let row = if self.invert {entry.row()} else {self.max_fragment_size as usize - entry.row()};
+
             // Possible valid column values
             let col_range = 0..self.ncol;
             // column coordinates of fragment bases
@@ -219,7 +232,7 @@ impl VMatrix {
 
             for col in fragment_range {
                 if col_range.contains(&col) {
-                    self.matrix[[entry.row(), col as usize]] += 1;
+                    self.matrix[[row, col as usize]] += 1;
                 }
             }
 
@@ -312,7 +325,7 @@ fn main() {
 
     let mut ventry = VEntry::allocate();
 
-    let mut vmatrix = VMatrix::allocate(&regions, &args.max_fragment_size, &args.multi);
+    let mut vmatrix = VMatrix::allocate(&regions, &args.max_fragment_size, &args.multi, &args.invert);
 
     let mut bed_region_n = 0 as i64;
     for bed_region in bed_reader.unwrap().records() {
