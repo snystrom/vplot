@@ -26,7 +26,11 @@ struct Cli {
     max_fragment_size: i64,
     /// How reads are counted in the matrix. Using either the midpoint of the fragment, fragment ends, or the whole fragment.
     #[structopt(default_value = "midpoint", short = "f", long = "fragment-type", possible_values = &["midpoint", "ends", "fragment"])]
-    fragment_type: String
+    fragment_type: String,
+    /// Instead of aggregating reads into 1 matrix, write 1 matrix for each region.
+    #[structopt(short = "m", long)]
+    multi: bool
+    //TODO: add flag to use bed column as matrix output name
 
 }
 
@@ -95,20 +99,34 @@ struct VMatrix {
     n_regions: i64,
     ncol: i64,
     nrow: i64,
-    max_fragment_size: i64
+    max_fragment_size: i64,
+    aggregate: bool
+}
+
+fn get_nrow(n_regions: &i64, max_fragment_size: &i64, multi: &bool) -> i64 {
+    if *multi {
+        let nrow: i64 = n_regions * max_fragment_size;
+        return nrow
+    } else
+    {
+        let nrow: i64 = 1 * max_fragment_size;
+        return nrow
+    };
+
 }
 
 impl VMatrix {
-    fn allocate(regions: &VRegions, max_fragment_size: &i64) -> VMatrix {
+    fn allocate(regions: &VRegions, max_fragment_size: &i64, multi: &bool) -> VMatrix {
 
-        let nrow: i64 = regions.n_regions * max_fragment_size;
+        let nrow = get_nrow(&regions.n_regions, max_fragment_size, multi);
 
         VMatrix {
             matrix: VMatrix::_initialize_matrix(nrow, regions.width),
+            n_regions: regions.n_regions,
             ncol: regions.width,
             nrow: nrow,
-            n_regions: regions.n_regions,
-            max_fragment_size: *max_fragment_size
+            max_fragment_size: *max_fragment_size,
+            aggregate: !multi
         }
 
     }
@@ -191,9 +209,9 @@ impl VRegions<'_> {
         let (n_regions, width) = VRegions::_get_dims_from_bed(path);
 
         VRegions {
-            path: path,
-            n_regions: n_regions,
-            width: width
+            path,
+            n_regions,
+            width
         }
     }
 
@@ -208,15 +226,20 @@ impl VRegions<'_> {
         let mut set_width = 0 as i64;
         let mut init = true;
         for region in bed_reader.unwrap().records() {
+            //eprintln!("{:?}", region);
             let record = region.unwrap();
             n_regions += 1;
             // Grab width of first region
             // all other regions should be this width
             if init {
+                //eprintln!("{:?}", record);
+                // TODO: throw error if set.width is negative. should end always be > start?
+                // maybe also consider parsing the strand column & conditionally enforcing this. ie if "." take abs, if + do end - start, if - do start - end
                 set_width = (record.end() - record.start()).try_into().unwrap();
                 init = false;
             }
 
+            //TODO: throw error if set.width is negative. should end always be > start?
             let width = (record.end() - record.start()).try_into().unwrap();
 
             if set_width != width {
@@ -224,6 +247,7 @@ impl VRegions<'_> {
             }
 
         }
+        //TODO: if aggregate == True, n_regions = 1
         (n_regions, set_width)
     }
 
@@ -244,7 +268,7 @@ fn main() {
 
     let mut ventry = VEntry::allocate();
 
-    let mut vmatrix = VMatrix::allocate(&regions, &args.max_fragment_size);
+    let mut vmatrix = VMatrix::allocate(&regions, &args.max_fragment_size, &args.multi);
 
     let mut bed_region_n = 0 as i64;
     for bed_region in bed_reader.unwrap().records() {
@@ -297,9 +321,13 @@ fn main() {
             }
 
         // Advance to next bed region
-        bed_region_n += 1;
+        // TODO: if -multi = True, increment this, else skip (to aggregate into 1 matrix)
+        if !vmatrix.aggregate {
+            bed_region_n += 1;
+        }
     }
 
+    // TODO: if multi = True, write 1 matrix per region to file
     let mut writer = csv::Writer::from_writer(std::io::stdout());
     writer.serialize_array2(&vmatrix.matrix)
           .expect("cannot write matrix to stdout");
