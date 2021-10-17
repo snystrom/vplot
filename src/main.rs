@@ -31,7 +31,7 @@ struct Cli {
     /// Matrices are written as 1 csv per region named: `chr-start-end.csv`
     #[structopt(short = "m", long)]
     multi: bool,
-    /// Set output file name. This option behaves differently depending on which input flags are set. See --help for details.
+    /// Set output file name or output directory. This option behaves differently depending on which input flags are set. See --help for details.
     ///
     /// If --multi is unset and -o is set to a directory, the output file will be written to: outdir/<bamfile>.vmatrix.csv.
     /// if --multi is unset and -o is a file path, output file will be written to this file name.
