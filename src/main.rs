@@ -134,42 +134,28 @@ impl VEntry {
         // Row in the VMatrix this entry should be inserted into
         // NOTE: region count has to be > 0, else will get all 0's for first region row positions
         // But ndarray is 0 indexed, so subtract 1 from final to get row #
-        (((self.region_n + 1) * self.insert_size.abs()) - 1).try_into().unwrap()
+        ((self.insert_size.abs()) - 1).try_into().unwrap()
     }
 }
 
 /// Holds the vplot matrix
 struct VMatrix {
     matrix: ndarray::Array2<i64>,
-    n_regions: i64,
     ncol: i64,
-    nrow: i64,
+    //nrow: i64,
     max_fragment_size: i64,
     aggregate: bool
-}
-
-fn get_nrow(n_regions: &i64, max_fragment_size: &i64, multi: &bool) -> i64 {
-    if *multi {
-        let nrow: i64 = n_regions * max_fragment_size;
-        return nrow
-    } else
-    {
-        let nrow: i64 = 1 * max_fragment_size;
-        return nrow
-    };
-
 }
 
 impl VMatrix {
     fn allocate(regions: &VRegions, max_fragment_size: &i64, multi: &bool) -> VMatrix {
 
-        let nrow = get_nrow(&regions.n_regions, max_fragment_size, multi);
+        let nrow = *max_fragment_size;
 
         VMatrix {
             matrix: VMatrix::_initialize_matrix(nrow, regions.width),
-            n_regions: regions.n_regions,
             ncol: regions.width,
-            nrow: nrow,
+            //nrow: nrow,
             max_fragment_size: *max_fragment_size,
             aggregate: !multi
         }
@@ -297,7 +283,7 @@ impl VRegions<'_> {
             }
 
         }
-        //TODO: if aggregate == True, n_regions = 1
+
         (n_regions, set_width)
     }
 

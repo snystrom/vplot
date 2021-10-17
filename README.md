@@ -51,8 +51,7 @@ column is 5' end), and rows are fragment size (top row is *smallest* fragment
 size)
 
 ``` sh
-
-vplot 0.3.1
+vplot 0.3.11
 
 USAGE:
     vplot [FLAGS] [OPTIONS] <bam> <regions>
@@ -68,8 +67,8 @@ OPTIONS:
                                            fragment, fragment ends, or the whole fragment [default: midpoint]  [possible
                                            values: midpoint, ends, fragment]
     -x, --max-size <max-fragment-size>     Maximum fragment size to include in the V-plot matrix [default: 700]
-    -o, --output <output>                  Set output file name. This option behaves differently depending on which
-                                           input flags are set. See --help for details [default: -]
+    -o, --output <output>                  Set output file name or output directory. This option behaves differently
+                                           depending on which input flags are set. See --help for details [default: -]
 
 ARGS:
     <bam>        Path to an indexed bam file
