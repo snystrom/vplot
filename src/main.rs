@@ -401,6 +401,9 @@ fn main() {
     }
 
 
+    // TODO: abstract these into methods on VMatrix to clean things up for v1
+    // in particular, focus on ability to export to multiple filetypes.
+    // leaving this horrible mess here for now cause it compiles.
     fn write_mat_stdout(vmatrix: &VMatrix){
         let mut writer = csv::Writer::from_writer(std::io::stdout());
         writer.serialize_array2(&vmatrix.matrix)
