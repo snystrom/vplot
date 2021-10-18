@@ -74,6 +74,5 @@ OPTIONS:
 ARGS:
     <bam>        Path to an indexed bam file
     <regions>    Path to a bed file (must be in bed4 format: chr, start, end, strand) Of a region (or regions) in
-                 which to generate the vplot. If using multiple regions, all entries must be the same width. (NOTE:
-                 using more than 1 region is poorly supported currently, but technically works)
+                 which to generate the vplot. If using multiple regions, all entries must be the same width. 
 ```

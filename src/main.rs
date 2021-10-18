@@ -18,7 +18,9 @@ struct Cli {
     bam: std::path::PathBuf,
     /// Path to a bed file (must be in bed4 format: chr, start, end, strand) Of
     /// a region (or regions) in which to generate the vplot. If using multiple
-    /// regions, all entries must be the same width. (NOTE: using more than 1 region is poorly supported currently, but technically works)
+    /// regions, all entries must be the same width. If setting multiple
+    /// regions, reads will be aggregated into a single matrix unless `--multi`
+    /// is set.
     #[structopt(parse(from_os_str))]
     regions: std::path::PathBuf,
     /// Maximum fragment size to include in the V-plot matrix
