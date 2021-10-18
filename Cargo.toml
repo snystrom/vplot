@@ -1,6 +1,6 @@
 [package]
 name = "vplot"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["Spencer Nystrom <nystromdev@gmail.com>"]
 edition = "2018"
 
