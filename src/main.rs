@@ -141,12 +141,7 @@ fn main() {
                 match &args.fragment_type[..] {
                     "ends" => vmatrix.insert_fragment_ends(&ventry),
                     "fragment" => vmatrix.insert_fragment(&ventry),
-                    "midpoint" => {
-                        // TODO: move this logic into the insert function like the other two.
-                        if bed_range.contains(&ventry.midpoint().try_into().unwrap()) {
-                            vmatrix.insert_midpoint(&ventry);
-                        }
-                    },
+                    "midpoint" => vmatrix.insert_midpoint(&ventry),
                     _ => println!("Error: Unknown fragment type"),
 
                     }

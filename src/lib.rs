@@ -48,6 +48,18 @@ impl VEntry {
         self.start + (self.insert_size/2)
     }
 
+    /// Return column coordinate of read start position
+    /// This is really just 0-based relative coordinates from start of the region.
+    pub fn start_col(&self) -> i64 {
+        self.start - self.region_start
+    }
+
+    /// Return column coordinate of read end position
+    /// This is really just 0-based relative coordinates from start of the region
+    pub fn end_col(&self) -> i64 {
+        (self.start + self.insert_size) - self.region_start
+    }
+
     /// Update fragment entry
     /// Allows operation in same allocation
     pub fn update(&mut self, region: &bed::Record, region_n: i64, read: &bam::Record) {
@@ -64,7 +76,7 @@ impl VEntry {
         // NOTE: region count has to be > 0, else will get all 0's for first region row positions
         // But ndarray is 0 indexed, so subtract 1 from final to get row #
         //((self.insert_size.abs()) - 1).try_into().unwrap()
-        (self.insert_size.abs()).try_into().unwrap()
+        self.insert_size.abs().try_into().unwrap()
     }
 }
 
@@ -108,8 +120,13 @@ impl VMatrix {
 
             let row = if self.invert {entry.row()} else {self.max_fragment_size as usize - entry.row()};
 
-            //self.matrix[[entry.row(), col as usize]] += 1;
-            self.matrix[[row, col as usize]] += 1;
+            // Possible valid column values
+            let col_range = 0..self.ncol;
+            if col_range.contains(&col) {
+                //self.matrix[[entry.row(), col as usize]] += 1;
+                self.matrix[[row, col as usize]] += 1;
+            }
+
         }
     }
 
