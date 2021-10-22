@@ -3,7 +3,6 @@ extern crate ndarray_csv;
 
 use bio::io::bed;
 use structopt::StructOpt;
-use ndarray_csv::Array2Writer;
 use rust_htslib::{bam, bam::Read};
 
 use vplot::{VMatrix, VEntry, VRegions};
@@ -88,11 +87,30 @@ fn connect_indexed_bam(path: &std::path::PathBuf) -> bam::IndexedReader {
         .expect("Cannot read bam file")
 }
 
+/// if path is - set prefix to ""
 fn get_output_prefix(path: &str) -> &str {
     match path {
         "-" => "",
         _ => path
     }
+}
+
+/// If path is a directory, return "{path}/{bam}.vmatrix.csv",
+/// otherwise ignore bam name & return only path.
+fn get_output_filename(path: &str, bam: &str) -> String {
+    // if path is directory write to dir/vmatrix.csv
+    // https://stackoverflow.com/a/64952550
+
+    let outfile;
+
+    if path.ends_with("/") {
+        outfile = format!("{}/{}.vmatrix.csv", &path, &bam);
+    } else {
+        outfile = path.to_string();
+    }
+
+    outfile
+
 }
 
 fn main() {
@@ -147,42 +165,19 @@ fn main() {
             // Advance to next bam region
             check = bam_reader.read(&mut read);
 
-            }
+        }
 
-
-        // Advance to next bed region
-        // TODO: if -multi = True, increment this, else skip (to aggregate into 1 matrix)
+        // If -multi = True, write matrix to file at "{prefix}{chrom}-{start}-{end}.csv"
+        // then zero matrix to hold signal for next region
         if !vmatrix.aggregate {
 
-            // write csv named "{chr}-{start}-{end}.csv"
-            // then re-zero matrix
+            // write csv named "{prefix}{chr}-{start}-{end}.csv"
             let region_name = format!("{}{}-{}-{}.csv", output_prefix, region_chrom, region.start(), region.end());
 
-            let mut writer = csv::Writer::from_path(&region_name)
-                .expect(&format!("cannot open connection to {} for writing", &region_name));
-
-            writer.serialize_array2(&vmatrix.matrix)
-                  .expect(&format!("cannot write matrix to {}", &region_name));
-
-            vmatrix.clear();
-
-        }
-    }
-
-    fn get_output_filename(path: &str, bam: &str) -> String {
-        // if path is directory write to dir/vmatrix.csv
-        // https://stackoverflow.com/a/64952550
-
-        let outfile;
-
-        if path.ends_with("/") {
-            outfile = format!("{}/{}.vmatrix.csv", &path, &bam);
-        } else {
-            outfile = path.to_string();
+            vmatrix.write_csv(&region_name);
         }
 
-        outfile
-
+        // Advance to next bed region
     }
 
     let output_path : String = get_output_filename(output_prefix, &args.bam.into_os_string().into_string().unwrap());
