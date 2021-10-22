@@ -84,7 +84,7 @@ struct Cli {
 fn connect_indexed_bam(path: &std::path::PathBuf) -> bam::IndexedReader {
     bam::IndexedReader::from_path(path)
         .ok()
-        .expect("Cannot read bam file")
+        .expect("Cannot read bam file. Ensure an index is present (samtools index <bamfile>).")
 }
 
 /// if path is - set prefix to ""
