@@ -17,10 +17,6 @@ pub struct VEntry {
     region_start: i64,
     /// End coordinate of the bed region
     region_end: i64,
-    /// index of which bed region this fragment resides in
-    // must be i64 because it's used as a multiplier for other i64s
-    // so, future me, don't try getting clever
-    region_n: i64,
 }
 
 impl VEntry {
@@ -36,8 +32,6 @@ impl VEntry {
             region_start: -1,
             /// End point of fragment
             region_end: -1,
-            /// Tracks which bed region the read belongs to
-            region_n: -1
         }
     }
 
@@ -62,12 +56,11 @@ impl VEntry {
 
     /// Update fragment entry
     /// Allows operation in same allocation
-    pub fn update(&mut self, region: &bed::Record, region_n: i64, read: &bam::Record) {
+    pub fn update(&mut self, region: &bed::Record, read: &bam::Record) {
         self.start = read.pos();
         self.insert_size = read.insert_size();
         self.region_start = region.start().try_into().unwrap();
         self.region_end = region.end().try_into().unwrap();
-        self.region_n = region_n
 
     }
 

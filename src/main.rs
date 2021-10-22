@@ -3,8 +3,6 @@ extern crate ndarray_csv;
 
 use bio::io::bed;
 use structopt::StructOpt;
-use std::convert::TryInto;
-//use ndarray::prelude::*;
 use ndarray_csv::Array2Writer;
 use rust_htslib::{bam, bam::Read};
 
@@ -108,7 +106,6 @@ fn main() {
 
     let mut vmatrix = VMatrix::new(&regions, &args.max_fragment_size, &args.multi, &args.invert);
 
-    let mut bed_region_n = 0 as i64;
     for bed_region in bed_reader.unwrap().records() {
         let region = bed_region.ok()
                                .expect("Error reading bed region");
@@ -116,7 +113,6 @@ fn main() {
         //println!("{}\t{}\t{}", region.chrom(), region.start(), region.end());
 
         let region_chrom = region.chrom();
-        let bed_range = std::ops::Range{start: region.start(), end: region.end()};
         let tid = bam_reader.header().tid(region_chrom.as_bytes()).unwrap();
 
         bam_reader.fetch(tid, region.start(), region.end()).unwrap();
@@ -136,7 +132,7 @@ fn main() {
             // double-counting read pairs, because the information I need is
             // stored in R1 and R2, I ignore R2.
             if read.is_proper_pair() && read.is_first_in_template() {
-                ventry.update(&region, bed_region_n, &read);
+                ventry.update(&region, &read);
 
                 match &args.fragment_type[..] {
                     "ends" => vmatrix.insert_fragment_ends(&ventry),
@@ -157,7 +153,6 @@ fn main() {
         // Advance to next bed region
         // TODO: if -multi = True, increment this, else skip (to aggregate into 1 matrix)
         if !vmatrix.aggregate {
-            bed_region_n += 1;
 
             // write csv named "{chr}-{start}-{end}.csv"
             // then re-zero matrix
