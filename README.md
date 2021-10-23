@@ -110,7 +110,7 @@ $ vplot --html -o ./ reads.bam regions.bed
 `vplot` will export an interactive vplot heatmap in html format that can be
 viewed in a web browser.
 
-View an [interactive example](example/heatmap-example.html).
+View an [interactive example](snystrom.github.io/vplot-heatmap-example.html).
 
 ![vplot heatmap example](img/vplot-example.png)
 
