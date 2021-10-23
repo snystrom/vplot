@@ -7,6 +7,10 @@ use rust_htslib::{bam, bam::Read};
 
 use vplot::{VMatrix, VEntry, VRegions};
 
+use plotly::common::{ColorScale, ColorScalePalette, Title};
+use plotly::contour::Contours;
+use plotly::{Contour, HeatMap, Layout, Plot};
+
 #[derive(StructOpt, Debug)]
 #[structopt(setting = structopt::clap::AppSettings::ArgRequiredElseHelp)]
 struct Cli {
@@ -30,19 +34,19 @@ struct Cli {
     #[structopt(short = "i", long)]
     invert: bool,
     /// Instead of aggregating reads into 1 matrix, write 1 matrix for each region.
-    /// Matrices are written as 1 csv per region named: `chr-start-end.csv`
+    /// Matrices are written as 1 csv per region named: `chr-start-end.vmatrix.csv`
     #[structopt(short = "m", long)]
     multi: bool,
     /// Set output file name or output directory. This option behaves differently depending on which input flags are set. See --help for details.
     ///
     /// If --multi is unset and -o is set to a directory, the output file will be written to: outdir/<bamfile>.vmatrix.csv.
     /// if --multi is unset and -o is a file path, output file will be written to this file name.
-    /// if --multi is set and -o is a directory, files will be written to outdir as: outdir/chr-start-end.csv.
-    /// if --multi is set and -o is a string, the string will be used as a prefix, and files will be written as: <prefix>chr-start-end.csv.
+    /// if --multi is set and -o is a directory, files will be written to outdir as: outdir/chr-start-end.vmatrix.csv.
+    /// if --multi is set and -o is a string, the string will be used as a prefix, and files will be written as: <prefix>chr-start-end.vmatrix.csv.
     ///
     /// Examples:
     ///
-    /// vplot reads.bam regions.bed > output.csv
+    /// vplot reads.bam regions.bed > output.vmatrix.csv
     ///
     /// vplot -o outdir/ reads.bam regions.bed
     ///
@@ -55,28 +59,32 @@ struct Cli {
     /// vplot -m -o outdir/ reads.bam regions.bed
     ///
     ///   returns:
-    ///      - outdir/chr1-1000-2000.csv
+    ///      - outdir/chr1-1000-2000.vmatrix.csv
     ///     
-    ///      - outdir/chr2-1000-2000.csv
+    ///      - outdir/chr2-1000-2000.vmatrix.csv
     ///
     /// vplot -m -o myPrefix_ reads.bam regions.bed
     ///
     ///   returns:
     ///
-    ///      - myPrefix_chr1-1000-2000.csv
+    ///      - myPrefix_chr1-1000-2000.vmatrix.csv
     ///
-    ///      - myPrefix_chr2-1000-2000.csv
+    ///      - myPrefix_chr2-1000-2000.vmatrix.csv
     ///
     /// vplot -m -o outdir/myPrefix_ reads.bam regions.bed
     ///
     ///   returns:
     ///
-    ///      - outdir/myPrefix_chr1-1000-2000.csv
+    ///      - outdir/myPrefix_chr1-1000-2000.vmatrix.csv
     ///
-    ///      - outdir/myPrefix_chr2-1000-2000.csv
+    ///      - outdir/myPrefix_chr2-1000-2000.vmatrix.csv
     ///
     #[structopt(default_value = "-", short = "o", long)]
     output: String,
+    /// Write an interactive vplot heatmap in HTML format.
+    /// Files are suffixed with `.vplot.html` following the rules outlined in the `--multi` helptext.
+    #[structopt(short = "ht", long = "html")]
+    write_html: bool,
     //TODO: add flag to use bed column as matrix output name
 
 }
@@ -113,12 +121,32 @@ fn get_output_filename(path: &str, bam: &str) -> String {
 
 }
 
+/// If path is a directory, return "{path}/{bam}.vplot.html",
+/// otherwise ignore bam name & return only "{path}.vplot.html".
+fn get_output_html_filename(path: &str, bam: &str) -> String {
+    // if path is directory write to dir/vmatrix.csv
+    // https://stackoverflow.com/a/64952550
+
+    let outfile;
+
+    if path.ends_with("/") {
+        outfile = format!("{}/{}.vplot.html", &path, &bam);
+    } else {
+        //outfile = path.to_string();
+        outfile = format!("{}.vplot.html", &path);
+    }
+
+    outfile
+
+}
+
 fn main() {
     let args = Cli::from_args();
     let regions = VRegions::new(&args.regions);
     let bed_reader = bed::Reader::from_file(regions.path);
     let mut bam_reader = connect_indexed_bam(&args.bam);
     let output_prefix = get_output_prefix(&args.output);
+    let write_html = args.write_html;
 
     let mut ventry = VEntry::new();
 
@@ -172,7 +200,15 @@ fn main() {
         if !vmatrix.aggregate {
 
             // write csv named "{prefix}{chr}-{start}-{end}.csv"
-            let region_name = format!("{}{}-{}-{}.csv", output_prefix, region_chrom, region.start(), region.end());
+            let region_name = format!("{}{}-{}-{}.vmatrix.csv", output_prefix, region_chrom, region.start(), region.end());
+
+            if write_html {
+                let html_path = format!("{}{}-{}-{}.vplot.html", output_prefix, region_chrom, region.start(), region.end());
+                //let mut plot = vmatrix.to_heatmap();
+                //plot.to_html(&html_name);
+                vmatrix.write_heatmap_html(&html_path)
+
+            }
 
             vmatrix.write_csv(&region_name);
         }
@@ -180,7 +216,21 @@ fn main() {
         // Advance to next bed region
     }
 
-    let output_path : String = get_output_filename(output_prefix, &args.bam.into_os_string().into_string().unwrap());
+    //TODO:
+    // test heatmap:
+    //let hm = HeatMap::new_z(vmatrix.matrix.genrows().collect().to_vec());
+    //let hm = HeatMap::new_z(vmatrix.matrix.outer_iter().collect::<i64>().to_vec());
+    //let heat_matrix_vec = vmatrix.matrix.outer_iter().map(|x| x.to_vec()).collect::<Vec<Vec<i64>>>();
+    //let hm = HeatMap::new_z(heat_matrix_vec);
+
+    let bampath = &args.bam.into_os_string().into_string().unwrap();
+
+    if write_html {
+        let html_path : String = get_output_html_filename(output_prefix, &bampath);
+        vmatrix.write_heatmap_html(&html_path);
+    }
+
+    let output_path : String = get_output_filename(output_prefix, &bampath);
 
     if vmatrix.aggregate {
         match output_prefix {

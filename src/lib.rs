@@ -2,11 +2,15 @@ extern crate bio;
 extern crate csv;
 extern crate ndarray;
 
+
 use std::convert::TryInto;
 use ndarray::prelude::*;
 use ndarray_csv::Array2Writer;
 use rust_htslib::bam;
 use bio::io::bed;
+
+use plotly::HeatMap;
+use plotly::common::{ColorScale, ColorScalePalette};
 
 pub struct VEntry {
     /// Start position of fragment
@@ -205,6 +209,28 @@ impl VMatrix {
 
     }
 
+    pub fn to_heatmap(&self) -> plotly::Plot {
+
+        // need to rev because rows are pushed from bottom-up to plot
+        let heatmap = HeatMap::new_z(self.matrix
+                       .outer_iter()
+                       .map(|x| x.to_vec())
+                       .rev()
+                       .collect::<Vec<Vec<i64>>>())
+                       .color_scale(ColorScale::Palette(ColorScalePalette::Greys));
+
+        //heatmap.color_scale(colors);
+        // .color_scale(ColorScale::Palette(ColorScalePalette::Viridis))
+        let mut plot = plotly::Plot::new();
+        plot.add_trace(heatmap);
+        plot
+
+    }
+
+    pub fn write_heatmap_html(&self, path: &str){
+        self.to_heatmap().to_html(&path);
+    }
+
     //if vmatrix.aggregate {
     //    match output_prefix {
     //        "" => write_mat_stdout(&vmatrix),
@@ -257,7 +283,7 @@ impl VRegions<'_> {
             }
 
             //TODO: throw error if set.width is negative. should end always be > start?
-            let width = (record.end() - record.start()).try_into().unwrap();
+            let width : i64 = (record.end() - record.start()).try_into().unwrap();
 
             if set_width != width {
                 panic!("All bed regions must be equal width\nWidth: {} of bed entry on line {} does not match width of first entry: {}", width, n_regions, set_width);

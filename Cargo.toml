@@ -11,3 +11,4 @@ rust-htslib = {version = "0.32", default-features = false}
 structopt = "*"
 ndarray = "0.13.1"
 ndarray-csv = "0.4.1"
+plotly = "*"
