@@ -88,21 +88,37 @@ $ vplot reads.bam regions.bed > vplot_matrix.csv
 # this writes a file per region
 $ vplot --multi reads.bam regions.bed 
     # returns:
-    chr2L-100-200.csv
-    chr3R-5000-5100.csv
+    chr2L-100-200.vmatrix.csv
+    chr3R-5000-5100.vmatrix.csv
 
 # set a custom file prefix for multi-output files:
 $ vplot --multi -o myPrefix_ reads.bam regions.bed 
     # returns:
-    myPrefix_chr2L-100-200.csv
-    myPrefix_chr3R-5000-5100.csv
+    myPrefix_chr2L-100-200.vmatrix.csv
+    myPrefix_chr3R-5000-5100.vmatrix.csv
+    
+$ vplot --html -o ./ reads.bam regions.bed 
+   # returns:
+   reads.bam.vmatrix.csv
+   reads.bam.vplot.html
 ```
+
+
+## Heatmap Visualizations
+
+`vplot` can also be used to generate vplot heatmaps. By setting `--html`,
+`vplot` will export an interactive vplot heatmap in html format that can be
+viewed in a web browser.
+
+View an [interactive example](example/heatmap-example.html).
+
+![vplot heatmap example](img/vplot-example.png)
+
 
 ## Full Help Text
 
 ``` sh
-
-vplot 0.3.4
+vplot 0.3.41
 
 USAGE:
     vplot [FLAGS] [OPTIONS] <bam> <regions>
@@ -116,10 +132,15 @@ FLAGS:
 
     -m, --multi      
             Instead of aggregating reads into 1 matrix, write 1 matrix for each region. Matrices are written as 1 csv
-            per region named: `chr-start-end.csv`
+            per region named: `chr-start-end.vmatrix.csv`
     -V, --version    
             Prints version information
 
+        --html       
+            Write an interactive vplot heatmap in HTML format. Files are suffixed with `.vplot.html` following the rules
+            outlined in the `--multi` helptext.
+            
+            If --html is set but -o is unset, heatmap will be written to "{bamfile}.vplot.html".
 
 OPTIONS:
     -f, --fragment-type <fragment-type>    
@@ -135,12 +156,12 @@ OPTIONS:
             If --multi is unset and -o is set to a directory, the output file will be written to:
             outdir/<bamfile>.vmatrix.csv. if --multi is unset and -o is a file path, output file will be written to this
             file name. if --multi is set and -o is a directory, files will be written to outdir as: outdir/chr-start-
-            end.csv. if --multi is set and -o is a string, the string will be used as a prefix, and
-            files will be written as: <prefix>chr-start-end.csv.
+            end.vmatrix.csv. if --multi is set and -o is a string, the string will be used as a prefix,
+            and files will be written as: <prefix>chr-start-end.vmatrix.csv.
             
             Examples:
             
-            vplot reads.bam regions.bed > output.csv
+            vplot reads.bam regions.bed > output.vmatrix.csv
             
             vplot -o outdir/ reads.bam regions.bed
             
@@ -152,25 +173,25 @@ OPTIONS:
             
             vplot -m -o outdir/ reads.bam regions.bed
             
-            returns: - outdir/chr1-1000-2000.csv
+            returns: - outdir/chr1-1000-2000.vmatrix.csv
             
-            - outdir/chr2-1000-2000.csv
+            - outdir/chr2-1000-2000.vmatrix.csv
             
             vplot -m -o myPrefix_ reads.bam regions.bed
             
             returns:
             
-            - myPrefix_chr1-1000-2000.csv
+            - myPrefix_chr1-1000-2000.vmatrix.csv
             
-            - myPrefix_chr2-1000-2000.csv
+            - myPrefix_chr2-1000-2000.vmatrix.csv
             
             vplot -m -o outdir/myPrefix_ reads.bam regions.bed
             
             returns:
             
-            - outdir/myPrefix_chr1-1000-2000.csv
+            - outdir/myPrefix_chr1-1000-2000.vmatrix.csv
             
-            - outdir/myPrefix_chr2-1000-2000.csv [default: -]
+            - outdir/myPrefix_chr2-1000-2000.vmatrix.csv [default: -]
 
 ARGS:
     <bam>        
