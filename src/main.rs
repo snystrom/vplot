@@ -14,7 +14,7 @@ struct Cli {
     /// Path to an indexed bam file
     #[structopt(parse(from_os_str))]
     bam: std::path::PathBuf,
-    /// Path to a bed file (must be in bed4 format: chr, start, end, strand) Of
+    /// Path to a bed file (must be in bed4 format: chr, start, end, name) Of
     /// a region (or regions) in which to generate the vplot. If using multiple
     /// regions, all entries must be the same width. If setting multiple
     /// regions, reads will be aggregated into a single matrix unless `--multi`

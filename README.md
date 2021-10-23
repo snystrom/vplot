@@ -74,6 +74,7 @@ Like examples? Here you go:
 ``` sh
 
 # regions must be equal width
+# and must be in bed4 format
 $ cat regions.bed
 chr2L   100 200 .
 chr3R   5000 5100 .
@@ -198,7 +199,7 @@ ARGS:
             Path to an indexed bam file
 
     <regions>    
-            Path to a bed file (must be in bed4 format: chr, start, end, strand) Of a region (or regions) in which to
+            Path to a bed file (must be in bed4 format: chr, start, end, name) Of a region (or regions) in which to
             generate the vplot. If using multiple regions, all entries must be the same width. If setting multiple
             regions, reads will be aggregated into a single matrix unless `--multi` is set
 ```

@@ -1072,7 +1072,7 @@ checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 
 [[package]]
 name = "vplot"
-version = "0.3.41"
+version = "0.3.422"
 dependencies = [
  "bio",
  "csv",
