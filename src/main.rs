@@ -7,9 +7,6 @@ use rust_htslib::{bam, bam::Read};
 
 use vplot::{VMatrix, VEntry, VRegions};
 
-use plotly::common::{ColorScale, ColorScalePalette, Title};
-use plotly::contour::Contours;
-use plotly::{Contour, HeatMap, Layout, Plot};
 
 #[derive(StructOpt, Debug)]
 #[structopt(setting = structopt::clap::AppSettings::ArgRequiredElseHelp)]
@@ -83,7 +80,9 @@ struct Cli {
     output: String,
     /// Write an interactive vplot heatmap in HTML format.
     /// Files are suffixed with `.vplot.html` following the rules outlined in the `--multi` helptext.
-    #[structopt(short = "ht", long = "html")]
+    ///
+    /// If --html is set but -o is unset, heatmap will be written to "{bamfile}.vplot.html".
+    #[structopt(long = "html")]
     write_html: bool,
     //TODO: add flag to use bed column as matrix output name
 
@@ -132,8 +131,10 @@ fn get_output_html_filename(path: &str, bam: &str) -> String {
     if path.ends_with("/") {
         outfile = format!("{}/{}.vplot.html", &path, &bam);
     } else {
-        //outfile = path.to_string();
-        outfile = format!("{}.vplot.html", &path);
+        outfile = match path {
+            "" => format!("{}.vplot.html", &bam),
+            _ => format!("{}.vplot.html", &path)
+        };
     }
 
     outfile
@@ -215,13 +216,6 @@ fn main() {
 
         // Advance to next bed region
     }
-
-    //TODO:
-    // test heatmap:
-    //let hm = HeatMap::new_z(vmatrix.matrix.genrows().collect().to_vec());
-    //let hm = HeatMap::new_z(vmatrix.matrix.outer_iter().collect::<i64>().to_vec());
-    //let heat_matrix_vec = vmatrix.matrix.outer_iter().map(|x| x.to_vec()).collect::<Vec<Vec<i64>>>();
-    //let hm = HeatMap::new_z(heat_matrix_vec);
 
     let bampath = &args.bam.into_os_string().into_string().unwrap();
 
